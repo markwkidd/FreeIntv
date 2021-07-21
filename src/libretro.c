@@ -24,6 +24,7 @@
 
 #include "intv.h"
 #include "memory.h"
+#include "cp1610.h"
 #include "stic.h"
 #include "psg.h"
 #include "controller.h"
@@ -114,8 +115,8 @@ void retro_init(void)
 	struct retro_keyboard_callback kb = { Keyboard };
 
 	// init buffers, structs
-	memset(frame, 0, frameSize);
-	OSD_setDisplay(frame, MaxWidth, MaxHeight);
+	memset(CTX(frame), 0, frameSize);
+	OSD_setDisplay(CTX(frame), MaxWidth, MaxHeight);
 
 	// setup controller swap
 	controllerInit();
@@ -280,8 +281,8 @@ void retro_run(void)
 		Run();
 
 		// draw overlays
-		if(showKeypad0) { drawMiniKeypad(0, frame); }
-		if(showKeypad1) { drawMiniKeypad(1, frame); }
+		if(showKeypad0) { drawMiniKeypad(0, CTX(frame)); }
+		if(showKeypad1) { drawMiniKeypad(1, CTX(frame)); }
 
 		// sample audio from buffer
 		audioInc = 3733.5 / audioSamples;
@@ -318,7 +319,7 @@ void retro_run(void)
     if (intv_halt)
         OSD_drawTextBG(3, 5, "INTELLIVISION HALTED");
 	// send frame to libretro
-	Video(frame, frameWidth, frameHeight, sizeof(unsigned int) * frameWidth);
+	Video(CTX(frame), frameWidth, frameHeight, sizeof(unsigned int) * frameWidth);
 
 }
 
@@ -373,7 +374,7 @@ RETRO_API void *retro_get_memory_data(unsigned id)
 {
 	if(id==RETRO_MEMORY_SYSTEM_RAM)
 	{
-		return Memory;
+		return CTX(Memory);
 	}
 	return 0;
 }
@@ -387,11 +388,43 @@ RETRO_API size_t retro_get_memory_size(unsigned id)
 	return 0;
 }
 
+size_t retro_serialize_size(void) { 
+	return sizeof(gCP1610_Context);
+}
+
+bool retro_serialize(void *data, size_t size) { 
+	if(size != retro_serialize_size())
+	{
+		// Uhoh
+		return false;
+	}
+
+	memcpy(data, &gCP1610_Context, sizeof(gCP1610_Context));
+
+	return true;
+}
+
+bool retro_unserialize(const void *data, size_t size) {
+	if(size != retro_serialize_size())
+	{
+		// Uhoh
+		return false;
+	}
+
+	PCP1610_Context restoreContext = (PCP1610_Context)data;
+	if(restoreContext->Version != 1)
+	{
+		// Uhoh, TODO
+		return false;
+	}
+
+	memcpy(&gCP1610_Context, restoreContext, sizeof(gCP1610_Context));
+
+	return true;	
+}
+
 /* Stubs */
 unsigned int retro_api_version(void) { return RETRO_API_VERSION; }
-size_t retro_serialize_size(void) { return 0; }
-bool retro_serialize(void *data, size_t size) { return false; }
-bool retro_unserialize(const void *data, size_t size) { return false; }
 void retro_cheat_reset(void) {  }
 void retro_cheat_set(unsigned index, bool enabled, const char *code) {  }
 bool retro_load_game_special(unsigned game_type, const struct retro_game_info *info, size_t num_info) { return false; }
