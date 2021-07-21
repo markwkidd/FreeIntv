@@ -24,6 +24,7 @@
 
 #include "intv.h"
 #include "memory.h"
+#include "cp1610.h"
 #include "stic.h"
 #include "psg.h"
 #include "controller.h"
@@ -114,8 +115,8 @@ void retro_init(void)
 	struct retro_keyboard_callback kb = { Keyboard };
 
 	// init buffers, structs
-	memset(frame, 0, frameSize);
-	OSD_setDisplay(frame, MaxWidth, MaxHeight);
+	memset(CTX(frame), 0, frameSize);
+	OSD_setDisplay(CTX(frame), MaxWidth, MaxHeight);
 
 	// setup controller swap
 	controllerInit();
@@ -221,12 +222,59 @@ void retro_run(void)
 		if(paused)
 		{
 			OSD_drawPaused();
+#ifdef XBOXPADSTYLEHELP
+			OSD_drawTextCenterBG(21, "HELP - PRESS B");
+#else
 			OSD_drawTextCenterBG(21, "HELP - PRESS A");
+#endif
 		}
 	}
 
 	if(paused)
 	{
+#ifdef XBOXPADSTYLE
+		// If core is being built for a device which uses XBOX style
+		// facebuttons instead of retropad. Reverse the mapping help
+		// help menu //
+		if(joypad0[4]==1 || joypad1[4]==1)
+		{
+			OSD_drawTextBG(3,  4, "                                      ");
+			OSD_drawTextBG(3,  5, "               - HELP -               ");
+			OSD_drawTextBG(3,  6, "                                      ");
+			OSD_drawTextBG(3,  7, " B      - RIGHT ACTION BUTTON         ");
+			OSD_drawTextBG(3,  8, " A      - LEFT ACTION BUTTON          ");
+			OSD_drawTextBG(3,  9, " X      - TOP ACTION BUTTON           ");
+			OSD_drawTextBG(3, 10, " Y      - LAST SELECTED KEYPAD BUTTON ");
+			OSD_drawTextBG(3, 11, " L/R    - SHOW KEYPAD                 ");
+			OSD_drawTextBG(3, 12, "                                      ");
+			OSD_drawTextBG(3, 13, " START  - PAUSE GAME                  ");
+			OSD_drawTextBG(3, 14, " SELECT - SWAP LEFT/RIGHT CONTROLLERS ");
+			OSD_drawTextBG(3, 15, "                                      ");
+			OSD_drawTextBG(3, 16, " FREEINTV 1.2          LICENSE GPL V3 ");
+			OSD_drawTextBG(3, 17, "                                      ");
+		}
+#elif defined(NIGHTSTALKER) || defined(ASTROSMASH) || defined(PINBALL) || defined(SHARKSHARK) || defined(SLAPSHOT)
+		// These games have special mappings so the mapping details
+		// are offputting so just tell them to refer to manual or overlay.
+		// help menu //
+		if(joypad0[4]==1 || joypad1[4]==1)
+		{
+			OSD_drawTextBG(3,  4, "                                      ");
+			OSD_drawTextBG(3,  5, "               - HELP -               ");
+			OSD_drawTextBG(3,  6, "                                      ");
+			OSD_drawTextBG(3,  7, "                                      ");
+			OSD_drawTextBG(3,  8, "         PLEASE CHECK MANUAL          ");
+			OSD_drawTextBG(3,  9, "              OR OVERLAY              ");
+			OSD_drawTextBG(3, 10, "                                      ");
+			OSD_drawTextBG(3, 11, " L/R    - SHOW KEYPAD                 ");
+			OSD_drawTextBG(3, 12, "                                      ");
+			OSD_drawTextBG(3, 13, " START  - PAUSE GAME                  ");
+			OSD_drawTextBG(3, 14, " SELECT - SWAP LEFT/RIGHT CONTROLLERS ");
+			OSD_drawTextBG(3, 15, "                                      ");
+			OSD_drawTextBG(3, 16, " FREEINTV 1.2          LICENSE GPL V3 ");
+			OSD_drawTextBG(3, 17, "                                      ");
+		}
+#else
 		// help menu //
 		if(joypad0[4]==1 || joypad1[4]==1)
 		{
@@ -242,9 +290,10 @@ void retro_run(void)
 			OSD_drawTextBG(3, 13, " START  - PAUSE GAME                  ");
 			OSD_drawTextBG(3, 14, " SELECT - SWAP LEFT/RIGHT CONTROLLERS ");
 			OSD_drawTextBG(3, 15, "                                      ");
-			OSD_drawTextBG(3, 16, " FREEINTV 1.1          LICENSE GPL V3 ");
+			OSD_drawTextBG(3, 16, " FREEINTV 1.2          LICENSE GPL V3 ");
 			OSD_drawTextBG(3, 17, "                                      ");
 		}
+#endif
 	}
 	else
 	{
@@ -280,8 +329,8 @@ void retro_run(void)
 		Run();
 
 		// draw overlays
-		if(showKeypad0) { drawMiniKeypad(0, frame); }
-		if(showKeypad1) { drawMiniKeypad(1, frame); }
+		if(showKeypad0) { drawMiniKeypad(0, CTX(frame)); }
+		if(showKeypad1) { drawMiniKeypad(1, CTX(frame)); }
 
 		// sample audio from buffer
 		audioInc = 3733.5 / audioSamples;
@@ -297,7 +346,7 @@ void retro_run(void)
 		audioBufferPos = 0.0;
 		PSGFrame();
 	}
-
+#ifndef SHARKSHARK
 	// Swap Left/Right Controller
 	if(joypad0[9]==1 || joypad1[9]==1)
 	{
@@ -314,11 +363,11 @@ void retro_run(void)
 			OSD_drawRightLeft();
 		}
 	}
-
+#endif
     if (intv_halt)
         OSD_drawTextBG(3, 5, "INTELLIVISION HALTED");
 	// send frame to libretro
-	Video(frame, frameWidth, frameHeight, sizeof(unsigned int) * frameWidth);
+	Video(CTX(frame), frameWidth, frameHeight, sizeof(unsigned int) * frameWidth);
 
 }
 
@@ -331,7 +380,7 @@ void retro_get_system_info(struct retro_system_info *info)
 {
 	memset(info, 0, sizeof(*info));
 	info->library_name = "FreeIntv";
-	info->library_version = "1.1";
+	info->library_version = "1.2";
 	info->valid_extensions = "int|bin|rom";
 	info->need_fullpath = true;
 }
@@ -373,7 +422,7 @@ RETRO_API void *retro_get_memory_data(unsigned id)
 {
 	if(id==RETRO_MEMORY_SYSTEM_RAM)
 	{
-		return Memory;
+		return CTX(Memory);
 	}
 	return 0;
 }
@@ -387,11 +436,43 @@ RETRO_API size_t retro_get_memory_size(unsigned id)
 	return 0;
 }
 
+size_t retro_serialize_size(void) { 
+	return sizeof(gCP1610_Context);
+}
+
+bool retro_serialize(void *data, size_t size) { 
+	if(size != retro_serialize_size())
+	{
+		// Uhoh
+		return false;
+	}
+
+	memcpy(data, &gCP1610_Context, sizeof(gCP1610_Context));
+
+	return true;
+}
+
+bool retro_unserialize(const void *data, size_t size) {
+	if(size != retro_serialize_size())
+	{
+		// Uhoh
+		return false;
+	}
+
+	PCP1610_Context restoreContext = (PCP1610_Context)data;
+	if(restoreContext->Version != 1)
+	{
+		// Uhoh, TODO
+		return false;
+	}
+
+	memcpy(&gCP1610_Context, restoreContext, sizeof(gCP1610_Context));
+
+	return true;	
+}
+
 /* Stubs */
 unsigned int retro_api_version(void) { return RETRO_API_VERSION; }
-size_t retro_serialize_size(void) { return 0; }
-bool retro_serialize(void *data, size_t size) { return false; }
-bool retro_unserialize(const void *data, size_t size) { return false; }
 void retro_cheat_reset(void) {  }
 void retro_cheat_set(unsigned index, bool enabled, const char *code) {  }
 bool retro_load_game_special(unsigned game_type, const struct retro_game_info *info, size_t num_info) { return false; }
